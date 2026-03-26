@@ -1,5 +1,5 @@
 @layer components {
-    /* Quill Toolbar */
+    /* Quill Toolbarr */
     .ql-toolbar.ql-snow {
         @apply border-0 border-b border-gray-200 bg-gray-50 px-4 py-3;
     }
