@@ -72,13 +72,21 @@ export const navItems = [
     ]
   },
   
-  // Add Threads section
   {
-    icon: "threads", // or "threads" or "comments"
+    icon: "threads",
     label: "Threads",
     children: [
       { label: "All Threads", path: "/threads" },
-      { label: "Create Thread", path: "/threads/create" }
+    ]
+  },
+  
+  // Tasks Section - Added here
+  {
+    icon: "tasks",
+    label: "Tasks",
+    children: [
+      { label: "All Tasks", path: "/tasks" },
+
     ]
   }
 ];

@@ -1,13 +1,18 @@
+// src/features/thread/pages/EditThread.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createThread } from '../service/threadService';
-import { getAllProjects } from '../../project/services/projectService';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getThreadById, updateThread } from '../service/threadService';
 import { getAllUsers } from '../../project/services/userService';
-import { ArrowLeft, Calendar, User, AlertCircle, Send, Loader } from 'lucide-react';
+import { ArrowLeft, Calendar, User, AlertCircle, Save, Loader, X } from 'lucide-react';
 
-const CreateThread = () => {
+const EditThread = () => {
+  const { threadId } = useParams();
   const navigate = useNavigate();
   
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({
     topic: '',
     description: '',
@@ -15,39 +20,43 @@ const CreateThread = () => {
     assignUserId: '',
     dueDate: ''
   });
-  
-  const [projects, setProjects] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchThreadAndUsers();
+  }, [threadId]);
 
-  const fetchData = async () => {
+  const fetchThreadAndUsers = async () => {
     try {
-      setFetching(true);
-      const [projectsRes, usersRes] = await Promise.all([
-        getAllProjects(1, 100),
-        getAllUsers()
-      ]);
+      setLoading(true);
       
-      if (projectsRes && projectsRes.success) {
-        setProjects(projectsRes.data?.data || projectsRes.data || []);
+      // Fetch thread details
+      const threadResponse = await getThreadById(threadId);
+      console.log("Thread data:", threadResponse);
+      
+      // Fetch users
+      const usersResponse = await getAllUsers();
+      
+      if (usersResponse && usersResponse.success) {
+        setUsers(usersResponse.data || []);
       }
       
-      if (usersRes && usersRes.success) {
-        setUsers(usersRes.data || []);
+      if (threadResponse && threadResponse.success) {
+        const thread = threadResponse.data;
+        setFormData({
+          topic: thread.topic || '',
+          description: thread.description || '',
+          priority: thread.priority || 3,
+          assignUserId: thread.assignUserId?.toString() || '',
+          dueDate: thread.dueDate ? thread.dueDate.split('T')[0] : ''
+        });
+      } else {
+        setError("Thread not found");
       }
     } catch (err) {
       console.error("Error fetching data:", err);
-      setError("Failed to load required data");
+      setError("Failed to load thread data");
     } finally {
-      setFetching(false);
+      setLoading(false);
     }
   };
 
@@ -61,10 +70,6 @@ const CreateThread = () => {
   };
 
   const validateForm = () => {
-    if (!selectedProject) {
-      setError('Please select a project');
-      return false;
-    }
     if (!formData.topic.trim()) {
       setError('Topic is required');
       return false;
@@ -89,7 +94,7 @@ const CreateThread = () => {
     
     if (!validateForm()) return;
     
-    setLoading(true);
+    setSaving(true);
     setError('');
     
     try {
@@ -101,24 +106,21 @@ const CreateThread = () => {
         dueDate: formData.dueDate
       };
       
-      console.log("Creating thread with data:", threadData);
+      console.log("Updating thread with data:", threadData);
       
-      const response = await createThread(selectedProject, threadData);
-      console.log("Thread created:", response);
+      const response = await updateThread(threadId, threadData);
+      console.log("Thread updated:", response);
       
       if (response && response.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          navigate('/threads');
-        }, 2000);
+        navigate(`/thread/${threadId}`);
       } else {
-        setError(response?.message || 'Failed to create thread');
+        setError(response?.message || 'Failed to update thread');
       }
     } catch (err) {
-      console.error("Error creating thread:", err);
-      setError(err.response?.data?.message || 'Failed to create thread. Please try again.');
+      console.error("Error updating thread:", err);
+      setError(err.response?.data?.message || 'Failed to update thread. Please try again.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -131,27 +133,12 @@ const CreateThread = () => {
     { value: 4, label: 'Critical', color: 'text-red-600', bg: 'bg-red-50' }
   ];
 
-  if (fetching) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader className="animate-spin rounded-full h-12 w-12 text-[#002d74] mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-8">
-          <div className="bg-green-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
-            <Send className="w-10 h-10 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Thread Created!</h2>
-          <p className="text-gray-600 mb-4">Your thread has been successfully created.</p>
-          <p className="text-sm text-gray-500">Redirecting to threads list...</p>
+          <p className="text-gray-600">Loading thread details...</p>
         </div>
       </div>
     );
@@ -163,14 +150,14 @@ const CreateThread = () => {
         {/* Header */}
         <div className="mb-6 flex items-center space-x-4">
           <button
-            onClick={() => navigate('/threads')}
+            onClick={() => navigate(`/thread/${threadId}`)}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#002d74]">Create New Thread</h1>
-            <p className="text-sm text-gray-500 mt-1">Start a discussion or report an issue</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#002d74]">Edit Thread</h1>
+            <p className="text-sm text-gray-500 mt-1">Update thread information</p>
           </div>
         </div>
 
@@ -181,26 +168,6 @@ const CreateThread = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Project Selection */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">
-                Project <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002d74] focus:border-transparent transition bg-white"
-                disabled={loading}
-              >
-                <option value="">Select a project</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Topic */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700">
@@ -213,7 +180,7 @@ const CreateThread = () => {
                 onChange={handleChange}
                 placeholder="e.g., Payment API bug, UI issue, Database error"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002d74] focus:border-transparent transition"
-                disabled={loading}
+                disabled={saving}
               />
             </div>
 
@@ -229,7 +196,7 @@ const CreateThread = () => {
                 rows="5"
                 placeholder="Describe the issue or discussion in detail..."
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002d74] focus:border-transparent transition resize-y"
-                disabled={loading}
+                disabled={saving}
               />
             </div>
 
@@ -242,14 +209,14 @@ const CreateThread = () => {
                 {priorityOptions.map((option) => (
                   <div
                     key={option.value}
-                    onClick={() => !loading && setFormData(prev => ({ ...prev, priority: option.value }))}
+                    onClick={() => !saving && setFormData(prev => ({ ...prev, priority: option.value }))}
                     className={`
                       flex items-center justify-center px-4 py-3 border-2 rounded-lg cursor-pointer transition-all
                       ${formData.priority === option.value 
                         ? `${option.bg} ${option.color} border-[#002d74] shadow-md` 
                         : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                       }
-                      ${loading ? 'opacity-50 cursor-not-allowed' : ''}
+                      ${saving ? 'opacity-50 cursor-not-allowed' : ''}
                     `}
                   >
                     <span className="font-medium">{option.label}</span>
@@ -270,7 +237,7 @@ const CreateThread = () => {
                   value={formData.assignUserId}
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002d74] focus:border-transparent transition bg-white"
-                  disabled={loading}
+                  disabled={saving}
                 >
                   <option value="">Select a user</option>
                   {users.map((user) => (
@@ -296,7 +263,7 @@ const CreateThread = () => {
                   onChange={handleChange}
                   min={today}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002d74] focus:border-transparent transition"
-                  disabled={loading}
+                  disabled={saving}
                   required
                 />
               </div>
@@ -314,26 +281,26 @@ const CreateThread = () => {
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => navigate('/threads')}
+                onClick={() => navigate(`/thread/${threadId}`)}
                 className="px-6 py-2 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
-                disabled={loading}
+                disabled={saving}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={saving}
                 className="inline-flex items-center px-6 py-2 bg-[#002d74] text-white rounded-lg font-medium hover:bg-[#001a4d] transition disabled:opacity-50"
               >
-                {loading ? (
+                {saving ? (
                   <>
                     <Loader className="animate-spin h-4 w-4 mr-2" />
-                    Creating...
+                    Saving...
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Create Thread
+                    <Save className="w-4 h-4 mr-2" />
+                    Update Thread
                   </>
                 )}
               </button>
@@ -345,4 +312,4 @@ const CreateThread = () => {
   );
 };
 
-export default CreateThread;
+export default EditThread;
