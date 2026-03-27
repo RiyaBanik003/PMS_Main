@@ -1,25 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { loginUser } from "../../../api/auth.api";
 import { useUserStore } from "../../../store/userStore";
 import { Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
-  const setUser = useUserStore((state) => state.setUser);
-  const navigate = useNavigate();
+  const login = useUserStore((state) => state.login);
+  const navigate = useNavigate(); 
+  
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      navigate("/login");
-    }
-  }, [navigate]);
+
+  // Remove this useEffect - it's causing redirect loop
+  // useEffect(() => {
+  //   const token = localStorage.getItem("accessToken");
+  //   if (!token) {
+  //     navigate("/login");
+  //   }
+  // }, [navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -31,19 +33,16 @@ const Login = () => {
 
     try {
       setLoading(true);
+      const result = await login({ email, password });
 
-      const res = await loginUser({ email, password });
-
-      const { accessToken, user } = res.data;
-
-      localStorage.setItem("accessToken", accessToken);
-      setUser(user, accessToken);
-
-      navigate("/dashboard");
+      if (result.success) {
+        navigate("/dashboard");
+      } else {
+        setError(result.error);
+      }
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Invalid email or password"
-      );
+      console.log(err)
+      setError("Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -52,8 +51,6 @@ const Login = () => {
   return (
     <section className="bg-gray-100 min-h-screen flex items-center justify-center">
       <div className="bg-white flex rounded-2xl max-w-3xl shadow-lg p-5">
-
-        {/* Left */}
         <div className="w-1/2 px-16">
           <h2 className="font-bold text-2xl text-[#002d74]">Login</h2>
           <p className="text-sm mt-4 text-[#002d74]">
@@ -61,7 +58,6 @@ const Login = () => {
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-
             <input
               type="email"
               placeholder="Enter your Email"
@@ -71,7 +67,6 @@ const Login = () => {
               required
             />
 
-            {/* Password with toggle */}
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -81,7 +76,6 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-
               <span
                 className="absolute right-3 top-2.5 cursor-pointer text-gray-500"
                 onClick={() => setShowPassword(!showPassword)}
@@ -90,9 +84,7 @@ const Login = () => {
               </span>
             </div>
 
-            {error && (
-              <p className="text-red-500 text-sm">{error}</p>
-            )}
+            {error && <p className="text-red-500 text-sm">{error}</p>}
 
             <button
               type="submit"
@@ -108,11 +100,9 @@ const Login = () => {
                 Register
               </Link>
             </p>
-
           </form>
         </div>
 
-        {/* Right */}
         <div className="w-1/2 p-5">
           <img
             src="/img1.png"
@@ -120,7 +110,6 @@ const Login = () => {
             className="h-full w-full rounded-2xl object-cover"
           />
         </div>
-
       </div>
     </section>
   );

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import EditorPreview from '../components/RichTextEditor'
-import {createProject} from '../services/projectService'
+import { createProject } from '../services/projectService'
 import { getAllUsers } from '../services/userService'
-
+import { getAllRoles } from '../../role/services/roleService'
 
 const CreateProject = () => {
   const [title, setTitle] = useState('')
@@ -10,144 +10,216 @@ const CreateProject = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [users, setUsers] = useState([])
-  
-  // Change from single user to array of selected members with roles
+  const [roles, setRoles] = useState([]) // Add roles state
   const [selectedMembers, setSelectedMembers] = useState([])
-  
-  // For the dropdown selection
   const [selectedUserId, setSelectedUserId] = useState("")
   const [selectedRole, setSelectedRole] = useState("")
 
+  // File upload state
+  const [file, setFile] = useState(null)
+  const [filePreview, setFilePreview] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchData = async () => {
       try {
-        const res = await getAllUsers()
-        console.log("Users API:", res)
-        
-        // Handle different response formats
+        // Fetch users
+        const usersRes = await getAllUsers()
+        console.log("Users API:", usersRes)
+
         let usersData = []
-        
-        if (res && res.success) {
-          // Try different common response structures
-          if (Array.isArray(res.data)) {
-            usersData = res.data
-          } else if (res.data && Array.isArray(res.data.users)) {
-            usersData = res.data.users
-          } else if (res.data && Array.isArray(res.data.data)) {
-            usersData = res.data.data
+        if (usersRes && usersRes.success) {
+          if (Array.isArray(usersRes.data)) {
+            usersData = usersRes.data
+          } else if (usersRes.data && Array.isArray(usersRes.data.users)) {
+            usersData = usersRes.data.users
+          } else if (usersRes.data && Array.isArray(usersRes.data.data)) {
+            usersData = usersRes.data.data
           }
         }
-        
+
         if (usersData.length > 0) {
           setUsers(usersData)
           console.log("Users set:", usersData)
-        } else {
-          console.warn("No users data received, using empty array")
-          setUsers([])
         }
+
+        // Fetch roles
+        const rolesRes = await getAllRoles()
+        console.log("Roles API:", rolesRes)
+
+        let rolesData = []
+        if (rolesRes && rolesRes.success) {
+          rolesData = Array.isArray(rolesRes.data) ? rolesRes.data : []
+        }
+
+        if (rolesData.length > 0) {
+          setRoles(rolesData)
+          console.log("Roles set:", rolesData)
+        } else {
+          // Fallback to default roles if API fails
+          setRoles([
+            { id: 1, name: "developer", displayName: "👨‍💻 Developer" },
+            { id: 2, name: "tester", displayName: "🧪 Tester" },
+            { id: 3, name: "admin", displayName: "🛡️ Admin" }
+          ])
+        }
+
       } catch (err) {
-        console.log("Error fetching users", err)
+        console.log("Error fetching data", err)
         setUsers([])
+        // Set default roles on error
+        setRoles([
+          { id: 1, name: "developer", displayName: "👨‍💻 Developer" },
+          { id: 2, name: "tester", displayName: "🧪 Tester" },
+          { id: 3, name: "admin", displayName: "🛡️ Admin" }
+        ])
       }
     }
 
-    fetchUsers()
+    fetchData()
   }, [])
 
-  // Function to add a member to the list
   const addMember = () => {
     if (!selectedUserId || !selectedRole) {
       alert("Please select both user and role")
       return
     }
 
-    // Check if user is already added
     if (selectedMembers.some(member => member.userId === selectedUserId)) {
       alert("This user is already added")
       return
     }
 
-    // Find the selected user details
     const selectedUser = users.find(u => u.id.toString() === selectedUserId)
-    
-    // Add to members list
+    const selectedRoleObj = roles.find(r => r.id.toString() === selectedRole || r.name === selectedRole)
+
     setSelectedMembers([
       ...selectedMembers,
       {
         userId: selectedUserId,
-        roleName: selectedRole,
+        roleName: selectedRoleObj?.name || selectedRole,
         userName: selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : selectedUserId
       }
     ])
 
-    // Reset selection
     setSelectedUserId("")
     setSelectedRole("")
   }
 
-  // Function to remove a member from the list
   const removeMember = (userId) => {
     setSelectedMembers(selectedMembers.filter(member => member.userId !== userId))
   }
 
-  const handleCreateProject = async (e) => {
-  e.preventDefault()
-  
-  if (!title || !desc) {
-    alert("Please fill project title and description")
-    return
-  }
+  // Handle file selection
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0]
 
-  if (selectedMembers.length === 0) {
-    alert("Please add at least one member to the project")
-    return
-  }
-  
-  setLoading(true)
-  setError(null)
-  
-  try {
-    // Function to remove HTML tags
-    const stripHtmlTags = (html) => {
-      // Create a temporary div element
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = html;
-      // Get text content without HTML tags
-      return tempDiv.textContent || tempDiv.innerText || '';
+    if (!selectedFile) return
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (selectedFile.size > maxSize) {
+      setError("File size should be less than 5MB")
+      setFile(null)
+      setFilePreview(null)
+      return
     }
 
-    // Clean the description by removing HTML tags
-    const cleanDescription = stripHtmlTags(desc);
-    
-    const projectData = {
-      title: title,
-      description: cleanDescription, // Use cleaned description without HTML tags
-      members: selectedMembers.map(({ userId, roleName }) => ({
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (!allowedTypes.includes(selectedFile.type)) {
+      setError("Only images, PDF, and Word documents are allowed")
+      setFile(null)
+      setFilePreview(null)
+      return
+    }
+
+    setFile(selectedFile)
+    setError(null)
+
+    // Create preview for images
+    if (selectedFile.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setFilePreview(reader.result)
+      }
+      reader.readAsDataURL(selectedFile)
+    } else {
+      setFilePreview(null)
+    }
+  }
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault()
+
+    if (!title || !desc) {
+      alert("Please fill project title and description")
+      return
+    }
+
+    if (selectedMembers.length === 0) {
+      alert("Please add at least one member to the project")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setUploadProgress(0)
+
+    try {
+      const stripHtmlTags = (html) => {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        return tempDiv.textContent || tempDiv.innerText || '';
+      }
+
+      const cleanDescription = stripHtmlTags(desc);
+
+      // Create FormData for file upload
+      const formData = new FormData()
+      formData.append('title', title)
+      formData.append('description', cleanDescription)
+      formData.append('members', JSON.stringify(selectedMembers.map(({ userId, roleName }) => ({
         userId,
         roleName
-      }))
+      }))))
+
+      // Append file if selected
+      if (file) {
+        formData.append('file', file)
+      }
+
+      // Use axios with upload progress tracking
+      const response = await createProject(formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          setUploadProgress(percentCompleted)
+        }
+      })
+
+      console.log("Project created", response)
+      alert("Project created successfully!")
+
+      // Reset form
+      setTitle("")
+      setDesc("")
+      setSelectedMembers([])
+      setSelectedUserId("")
+      setSelectedRole("")
+      setFile(null)
+      setFilePreview(null)
+      setUploadProgress(0)
+
+    } catch (error) {
+      console.log("Error creating project", error)
+      setError(error.response?.data?.message || 'Failed to create project')
+    } finally {
+      setLoading(false)
     }
-    
-    console.log("Sending project data:", projectData)
-    
-    const response = await createProject(projectData)
-    console.log("Project created", response)
-    alert("Project created successfully!")
-    
-    // Reset form
-    setTitle("")
-    setDesc("")
-    setSelectedMembers([])
-    setSelectedUserId("")
-    setSelectedRole("")
-    
-  } catch (error) {
-    console.log("Error creating project", error)
-    setError(error.response?.data?.message || 'Failed to create project')
-  } finally {
-    setLoading(false)
   }
-}
 
   return (
     <>
@@ -259,6 +331,7 @@ const CreateProject = () => {
         .cp-field:nth-child(1) { animation-delay: 0.05s; }
         .cp-field:nth-child(2) { animation-delay: 0.10s; }
         .cp-field:nth-child(3) { animation-delay: 0.15s; }
+        .cp-field:nth-child(4) { animation-delay: 0.20s; }
 
         .cp-label {
           display: flex;
@@ -325,6 +398,72 @@ const CreateProject = () => {
         .cp-editor-wrap:focus-within {
           border-color: #002d74;
           box-shadow: 0 0 0 4px rgba(0,45,116,0.07);
+        }
+
+        /* File upload styles */
+        .cp-file-upload {
+          border: 2px dashed #e2e8f0;
+          border-radius: 12px;
+          padding: 20px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background: #fafbff;
+        }
+
+        .cp-file-upload:hover {
+          border-color: #002d74;
+          background: #f0f4ff;
+        }
+
+        .cp-file-input {
+          display: none;
+        }
+
+        .cp-file-label {
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .cp-file-icon {
+          font-size: 32px;
+        }
+
+        .cp-file-text {
+          color: #6b7fa3;
+          font-size: 13px;
+        }
+
+        .cp-file-name {
+          margin-top: 8px;
+          font-size: 12px;
+          color: #002d74;
+          font-weight: 500;
+        }
+
+        .cp-file-preview {
+          margin-top: 12px;
+          max-width: 100%;
+          max-height: 200px;
+          border-radius: 8px;
+        }
+
+        .cp-progress-bar {
+          margin-top: 8px;
+          width: 100%;
+          height: 4px;
+          background: #e2e8f0;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+
+        .cp-progress-fill {
+          height: 100%;
+          background: #002d74;
+          transition: width 0.3s ease;
         }
 
         .cp-divider {
@@ -418,7 +557,6 @@ const CreateProject = () => {
 
         .cp-btn-submit:hover .cp-btn-arrow { transform: translateX(3px); }
 
-        /* New styles for members list */
         .cp-members-list {
           margin-top: 16px;
           border: 1px solid #e2e8f0;
@@ -498,8 +636,6 @@ const CreateProject = () => {
 
       <div className="cp-root">
         <div className="cp-wrapper">
-
-          {/* Header */}
           <div className="cp-eyebrow">
             <span className="cp-eyebrow-dot" />
             New Project
@@ -507,10 +643,8 @@ const CreateProject = () => {
           <h1 className="cp-title">Create a Project</h1>
           <p className="cp-subtitle">Fill in the details below to get your project started.</p>
 
-          {/* Card */}
           <div className="cp-card">
             <form onSubmit={handleCreateProject}>
-
               <div className="cp-field">
                 <label className="cp-label">
                   <span className="cp-step">1</span>
@@ -536,13 +670,56 @@ const CreateProject = () => {
                 </div>
               </div>
 
+              {/* File Upload Field */}
               <div className="cp-field">
                 <label className="cp-label">
                   <span className="cp-step">3</span>
+                  Attach File (Optional)
+                </label>
+                <div className="cp-file-upload">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="cp-file-input"
+                    onChange={handleFileChange}
+                    accept="image/*,.pdf,.doc,.docx"
+                  />
+                  <label htmlFor="file-upload" className="cp-file-label">
+                    <div className="cp-file-icon">📎</div>
+                    <div className="cp-file-text">
+                      Click to upload or drag and drop
+                    </div>
+                    <div className="cp-file-text" style={{ fontSize: '11px' }}>
+                      Supported: Images, PDF, Word (Max 5MB)
+                    </div>
+                  </label>
+                  {file && (
+                    <>
+                      <div className="cp-file-name">
+                        Selected: {file.name}
+                      </div>
+                      {filePreview && (
+                        <img src={filePreview} alt="Preview" className="cp-file-preview" />
+                      )}
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="cp-progress-bar">
+                          <div
+                            className="cp-progress-fill"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="cp-field">
+                <label className="cp-label">
+                  <span className="cp-step">4</span>
                   Add Team Members
                 </label>
 
-                {/* Member selection row */}
                 <div className="cp-add-member-row">
                   <select
                     value={selectedUserId}
@@ -559,19 +736,22 @@ const CreateProject = () => {
                       ))}
                   </select>
 
+                  {/* Dynamic Role Select Dropdown */}
                   <select
                     value={selectedRole}
                     onChange={(e) => setSelectedRole(e.target.value)}
                     className="cp-input cp-select"
                   >
                     <option value="">Select role</option>
-                    <option value="developer">👨‍💻 Developer</option>
-                    <option value="tester">🧪 Tester</option>
-                    <option value="admin">🛡️ Admin</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id.toString()}>
+                        {role.displayName || role.name}
+                      </option>
+                    ))}
                   </select>
 
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={addMember}
                     className="cp-add-btn"
                   >
@@ -579,7 +759,6 @@ const CreateProject = () => {
                   </button>
                 </div>
 
-                {/* Display selected members */}
                 {selectedMembers.length > 0 && (
                   <div className="cp-members-list">
                     <h4 style={{ margin: '0 0 10px 0', color: '#002d74' }}>Team Members:</h4>
@@ -620,14 +799,13 @@ const CreateProject = () => {
                   )}
                 </button>
               </div>
-
             </form>
           </div>
-
         </div>
       </div>
     </>
   )
 }
+
 
 export default CreateProject

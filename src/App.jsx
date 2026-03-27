@@ -4,10 +4,10 @@ import Register from "./features/auth/pages/Register";
 import Landing from "./components/Landing/Landing";
 import CreateProject from "./features/project/pages/CreateProject";
 import Dashboard from "./pages/Dashboard";
-import User from "./pages/User";
+import User from './features/user/pages/User'
 import Deployment from "./pages/Deployment";
 import Service from "./pages/Service";
-import Role from "./pages/Role";
+import Role from "./features/role/pages/Role";
 import { useEffect } from "react";
 import { useUserStore } from "./store/userStore";
 import ViewProject from "./pages/ViewProject";
@@ -20,6 +20,9 @@ import CreateThread from './features/thread/pages/CreateThread';
 import ViewThread from './features/thread/pages/viewThread';
 import EditThread from './features/thread/pages/EditThread'; // Create this component
 import EditTask from './features/task/pages/EditTask'; // Create this component
+import ViewUsers from "./features/user/pages/ViewUsers";
+import CreateRole from "./features/role/pages/Role";
+import ViewRoles from "./features/role/pages/ViewRoles";
 
 function App() {
   const loadUser = useUserStore((state) => state.loadUser);
@@ -58,6 +61,20 @@ function App() {
       <Route path="/threads/:threadId/tasks/:taskId/edit" element={<DashboardLayout><EditTask /></DashboardLayout>} />
       <Route path="/tasks" element={<DashboardLayout><Tasks /></DashboardLayout>} />
       <Route path="/my-tasks" element={<DashboardLayout><Tasks /></DashboardLayout>} />
+      <Route path="/projects/:projectId/threads" element={<DashboardLayout><Threads /></DashboardLayout>} />
+      <Route path="/users" element={
+        <DashboardLayout>
+          <ViewUsers />
+        </DashboardLayout>
+      } />
+
+      <Route path="/user" element={
+        <DashboardLayout>
+          <User />
+        </DashboardLayout>
+      } />
+      <Route path="/role" element={<DashboardLayout><CreateRole /></DashboardLayout>} />
+      <Route path="/view-role" element={<DashboardLayout><ViewRoles /></DashboardLayout>} />
     </Routes>
   );
 }

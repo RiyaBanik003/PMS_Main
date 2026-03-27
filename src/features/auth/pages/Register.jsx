@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axios"; // Use your configured axios
 
 const Register = () => {
   const navigate = useNavigate();
@@ -36,19 +36,11 @@ const Register = () => {
 
     try {
       setLoading(true);
-
-      await axios.post(
-        "https://pms-l909.onrender.com/api/v1/auth/register",
-        formData,
-        { withCredentials: true }
-      );
-
+      await api.post("/auth/register", formData);
       navigate("/login");
     } catch (err) {
       console.error(err);
-      setError(
-        err.response?.data?.message || "Registration failed"
-      );
+      setError(err.response?.data?.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -57,19 +49,15 @@ const Register = () => {
   return (
     <section className="bg-gray-100 min-h-screen flex items-center justify-center">
       <div className="bg-white flex rounded-2xl max-w-4xl shadow-lg p-6">
-
-        {/* Left Side */}
         <div className="w-1/2 px-12">
           <h2 className="font-bold text-2xl text-[#002d74]">
             Create Account
           </h2>
-
           <p className="text-sm mt-3 text-gray-600">
             Fill in the details below to register.
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-6">
-
             <div className="flex gap-4">
               <input
                 type="text"
@@ -90,8 +78,6 @@ const Register = () => {
                 required
               />
             </div>
-
-            
 
             <input
               type="email"
@@ -141,11 +127,9 @@ const Register = () => {
                 Login
               </Link>
             </p>
-
           </form>
         </div>
 
-        {/* Right Side */}
         <div className="w-1/2 p-6">
           <img
             src="/img1.png"
@@ -153,7 +137,6 @@ const Register = () => {
             className="h-full w-full rounded-2xl object-cover"
           />
         </div>
-
       </div>
     </section>
   );

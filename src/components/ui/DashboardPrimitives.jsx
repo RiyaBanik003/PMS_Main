@@ -3,10 +3,23 @@
 // ── Icon ────────────────────────────────────────────────────────────────────
 export function Icon({ type, size = 14, style = {} }) {
   const s = { width: size, height: size, flexShrink: 0, ...style };
-  const map = {
+
+  const icons = {
     home: (
       <svg style={s} viewBox="0 0 24 24" fill="currentColor">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      </svg>
+    ),
+
+    chevronLeft: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    ),
+
+    chevronRight: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9 18l6-6-6-6" />
       </svg>
     ),
 
@@ -18,7 +31,6 @@ export function Icon({ type, size = 14, style = {} }) {
       </svg>
     ),
 
-    // ROLE ICON (badge / person role style)
     roles: (
       <svg style={s} viewBox="0 0 24 24" fill="currentColor">
         <circle cx="12" cy="8" r="4" />
@@ -27,27 +39,25 @@ export function Icon({ type, size = 14, style = {} }) {
       </svg>
     ),
 
-    // PROJECT ICON (folder style)
     projects: (
       <svg style={s} viewBox="0 0 24 24" fill="currentColor">
         <path d="M3 6a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" />
       </svg>
     ),
 
-    // THREADS ICON
     threads: (
       <svg style={s} viewBox="0 0 24 24" fill="currentColor">
         <path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z" />
-        <path d="M7 13h6a3 3 0 013 3v1" fill="none" stroke="white" strokeWidth="1.5"/>
+        <path d="M7 13h6a3 3 0 013 3v1" fill="none" stroke="white" strokeWidth="1.5" />
       </svg>
     ),
 
-  // TASKS ICON - Clipboard style
-tasks: (
-  <svg style={s} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 7l2-2 4 4-4 4-2-2 2-2z" />
-  </svg>
-),
+    tasks: (
+      <svg style={s} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 7l2-2 4 4-4 4-2-2 2-2z" />
+      </svg>
+    ),
+
     chart: (
       <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -67,7 +77,8 @@ tasks: (
       </svg>
     ),
   };
-  return map[type] || null;
+
+  return icons[type] || null;
 }
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
