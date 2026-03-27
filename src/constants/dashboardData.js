@@ -60,21 +60,30 @@ export const sprintData = [
 
 export const navItems = [
   { icon: "home", label: "Overview", path: "/dashboard" },
-  { icon: "roles", label: "Role", path: "/role" },
-  { icon: "users", label: "User", path: "/user" },
-
+  { icon: "roles", label: "Role", 
+    children: [
+      { label: "Create Role", path: "/role" },
+      { label: "View Role", path: "/view-role" }
+    ]
+   },
+  {
+    icon: "users",
+    label: "User",
+    children: [
+      { label: "Create User", path: "/user" },
+      { label: "View Users", path: "/users" }  
+    ]
+  },
   {
     icon: "projects",
     label: "Project",
     children: [
       { label: "Create Project", path: "/editor" },
-      { label: "View Project", path: "/view-project" }
+      { label: "View Projects", path: "/view-project" }
     ]
   },
-  
-  // Add Threads section
   {
-    icon: "threads", // or "threads" or "comments"
+    icon: "threads",
     label: "Threads",
     children: [
       { label: "All Threads", path: "/threads" },

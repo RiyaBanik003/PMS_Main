@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getProjectById, deleteProject, updateProject } from '../features/project/services/projectService';
+import { getProjectById, deleteProject, updateProject, addProjectMember } from '../features/project/services/projectService';
 import { getAllUsers } from '../features/project/services/userService';
 import { getThreadsByProjectId, deleteThread } from '../features/thread/service/threadService'; // Add this import
 import { ArrowLeft, Calendar, User, Tag, Users, Clock, Edit, Trash2, X, Save, MessageSquare, Trash2 as TrashIcon, Eye, UserPlus } from 'lucide-react'; // Add MessageSquare, TrashIcon, Eye, UserPlus
+import { getAllRoles } from '../features/role/services/roleService'
 
 const ViewProject = () => {
   const { id } = useParams();
@@ -12,11 +13,11 @@ const ViewProject = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-  
+
   // Threads state
-  const [threads, setThreads] = useState([]); // Initialize as empty array
+  const [threads, setThreads] = useState([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
-  
+
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState({
@@ -26,7 +27,7 @@ const ViewProject = () => {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState(false);
-  
+
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -41,6 +42,7 @@ const ViewProject = () => {
   // Add member state
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [addingMember, setAddingMember] = useState(false);
@@ -54,7 +56,7 @@ const ViewProject = () => {
       setLoading(true);
       const response = await getProjectById(id);
       console.log("Project details:", response);
-      
+
       if (response && response.success) {
         setProject(response.data);
         setEditFormData({
@@ -72,37 +74,63 @@ const ViewProject = () => {
     }
   }, [id]);
 
-  // The fetchThreads function - fixed version
   const fetchThreads = useCallback(async () => {
     try {
       setThreadsLoading(true);
       const response = await getThreadsByProjectId(id);
       console.log("Threads response:", response);
-      
-      // SAFE: Always ensure threads is an array
+
       let threadsArray = [];
-      
+
       if (response && response.success) {
-        // Handle different possible response structures
         if (response.data && Array.isArray(response.data)) {
           threadsArray = response.data;
         } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
           threadsArray = response.data.data;
         } else if (Array.isArray(response)) {
           threadsArray = response;
-        } else {
-          threadsArray = [];
         }
       }
-      
+
       setThreads(threadsArray);
     } catch (err) {
       console.error("Error fetching threads:", err);
-      setThreads([]); // Always set to empty array on error
+      setThreads([]);
     } finally {
       setThreadsLoading(false);
     }
   }, [id]);
+
+  // Fetch roles from API
+  const fetchRoles = async () => {
+    try {
+      const rolesRes = await getAllRoles();
+      console.log("Roles API:", rolesRes);
+
+      let rolesData = [];
+      if (rolesRes && rolesRes.success) {
+        rolesData = Array.isArray(rolesRes.data) ? rolesRes.data : [];
+      }
+
+      if (rolesData.length > 0) {
+        setAvailableRoles(rolesData);
+        console.log("Roles set:", rolesData);
+      } else {
+        setAvailableRoles([
+          { id: 1, name: "developer", displayName: "👨‍💻 Developer" },
+          { id: 2, name: "tester", displayName: "🧪 Tester" },
+          { id: 3, name: "admin", displayName: "🛡️ Admin" }
+        ]);
+      }
+    } catch (err) {
+      console.log("Error fetching roles", err);
+      setAvailableRoles([
+        { id: 1, name: "developer", displayName: "👨‍💻 Developer" },
+        { id: 2, name: "tester", displayName: "🧪 Tester" },
+        { id: 3, name: "admin", displayName: "🛡️ Admin" }
+      ]);
+    }
+  };
 
   useEffect(() => {
     fetchProject();
@@ -114,10 +142,6 @@ const ViewProject = () => {
     }
   }, [activeTab, fetchThreads]);
 
-// In the Threads Tab JSX:
-
-
-  // Handle delete thread
   const handleDeleteThreadClick = (thread) => {
     setThreadToDelete(thread);
     setShowDeleteThreadModal(true);
@@ -125,11 +149,11 @@ const ViewProject = () => {
 
   const handleDeleteThreadConfirm = async () => {
     if (!threadToDelete) return;
-    
+
     try {
       setDeletingThread(true);
       const response = await deleteThread(threadToDelete.id);
-      
+
       if (response && response.success) {
         setThreads(threads.filter(t => t.id !== threadToDelete.id));
         setShowDeleteThreadModal(false);
@@ -145,7 +169,7 @@ const ViewProject = () => {
     }
   };
 
-  // Handle add member
+  // Updated handleAddMember to use the correct endpoint: /:projectId/members/:userId
   const handleAddMember = async () => {
     if (!selectedUserId || !selectedRole) {
       setAddMemberError("Please select both user and role");
@@ -162,26 +186,20 @@ const ViewProject = () => {
       setAddingMember(true);
       setAddMemberError("");
 
-      const updatedMembers = [
-        ...project.members,
-        {
-          userId: selectedUserId,
-          roleName: selectedRole,
-          userName: availableUsers.find(u => u.id.toString() === selectedUserId)?.firstName + " " + availableUsers.find(u => u.id.toString() === selectedUserId)?.lastName || selectedUserId
-        }
-      ];
+      // Find the selected role object to get the role name
+      const selectedRoleObj = availableRoles.find(r => r.id.toString() === selectedRole || r.name === selectedRole);
+      const roleName = selectedRoleObj?.displayName || selectedRoleObj?.name || selectedRole;
 
-      const response = await updateProject(id, {
-        title: project.title,
-        description: project.description,
-        members: updatedMembers.map(({ userId, roleName }) => ({ userId, roleName }))
+      // Call the add member endpoint: /:projectId/members/:userId
+      const response = await addProjectMember(id, selectedUserId, {
+        roleName: roleName
       });
 
+      console.log("Add member response:", response);
+
       if (response && response.success) {
-        setProject(prev => ({
-          ...prev,
-          members: updatedMembers
-        }));
+        // Refresh project to get updated members list
+        await fetchProject();
         setSelectedUserId("");
         setSelectedRole("");
         setShowAddMemberForm(false);
@@ -196,43 +214,49 @@ const ViewProject = () => {
     }
   };
 
-  // Handle remove member
+  // Updated handleRemoveMember - might need a separate endpoint
   const handleRemoveMember = async (userId) => {
     try {
       setRemovingMember(userId);
 
-      const updatedMembers = project.members.filter(member => member.userId.toString() !== userId.toString());
+      // If you have a separate remove member endpoint, use it
+      // Otherwise fall back to update project
+      try {
+        // Try to use remove member endpoint if available
+        // const response = await removeProjectMember(id, userId);
 
-      const response = await updateProject(id, {
-        title: project.title,
-        description: project.description,
-        members: updatedMembers.map(({ userId, roleName }) => ({ userId, roleName }))
-      });
+        // Fallback to update project
+        const updatedMembers = project.members.filter(member => member.userId.toString() !== userId.toString());
 
-      if (response && response.success) {
-        setProject(prev => ({
-          ...prev,
-          members: updatedMembers
-        }));
-      } else {
-        alert(response?.message || "Failed to remove member");
+        const response = await updateProject(id, {
+          title: project.title,
+          description: project.description,
+          members: updatedMembers.map(({ userId, roleName }) => ({ userId, roleName }))
+        });
+
+        if (response && response.success) {
+          setProject(prev => ({
+            ...prev,
+            members: updatedMembers
+          }));
+        } else {
+          alert(response?.message || "Failed to remove member");
+        }
+      } catch (err) {
+        console.error("Error removing member:", err);
+        alert("Failed to remove member");
       }
-    } catch (err) {
-      console.error("Error removing member:", err);
-      alert("Failed to remove member");
     } finally {
       setRemovingMember(null);
     }
   };
 
-  // Load available users when add member form is opened
   const loadAvailableUsers = async () => {
     try {
       console.log("Loading available users...");
       const response = await getAllUsers();
       console.log("Users API response:", response);
 
-      // Handle different response structures
       let usersData = [];
       if (response && response.success && Array.isArray(response.data)) {
         usersData = response.data;
@@ -250,14 +274,19 @@ const ViewProject = () => {
     }
   };
 
-  // Handle edit button click
+  // Load available users and roles when add member form is opened
+  const handleOpenAddMemberForm = async () => {
+    setShowAddMemberForm(true);
+    await loadAvailableUsers();
+    await fetchRoles();
+  };
+
   const handleEditClick = () => {
     setIsEditing(true);
     setUpdateSuccess(false);
     setUpdateError('');
   };
 
-  // Handle cancel edit
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditFormData({
@@ -267,7 +296,6 @@ const ViewProject = () => {
     setUpdateError('');
   };
 
-  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setEditFormData(prev => ({
@@ -276,7 +304,6 @@ const ViewProject = () => {
     }));
   };
 
-  // Handle save changes
   const handleSaveChanges = async () => {
     if (!editFormData.title.trim()) {
       setUpdateError('Project title is required');
@@ -286,15 +313,15 @@ const ViewProject = () => {
     try {
       setUpdating(true);
       setUpdateError('');
-      
+
       const updateData = {
         title: editFormData.title.trim(),
         description: editFormData.description.trim()
       };
-      
+
       const response = await updateProject(id, updateData);
       console.log("Update response:", response);
-      
+
       if (response && response.success) {
         setUpdateSuccess(true);
         setProject(prev => ({
@@ -302,7 +329,7 @@ const ViewProject = () => {
           title: editFormData.title,
           description: editFormData.description
         }));
-        
+
         setTimeout(() => {
           setIsEditing(false);
           setUpdateSuccess(false);
@@ -318,20 +345,18 @@ const ViewProject = () => {
     }
   };
 
-  // Handle delete button click
   const handleDeleteClick = () => {
     setShowDeleteModal(true);
   };
 
-  // Handle delete confirmation
   const handleDeleteConfirm = async () => {
     try {
       setDeleting(true);
       setDeleteError('');
-      
+
       const response = await deleteProject(id);
       console.log("Delete response:", response);
-      
+
       if (response && response.success) {
         setDeleteSuccess(true);
         setTimeout(() => {
@@ -354,7 +379,6 @@ const ViewProject = () => {
     setDeleteError('');
   };
 
-  // Strip HTML tags from description
   const stripHtmlTags = (html) => {
     if (!html) return '';
     const tempDiv = document.createElement('div');
@@ -362,7 +386,6 @@ const ViewProject = () => {
     return tempDiv.textContent || tempDiv.innerText || '';
   };
 
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -372,9 +395,8 @@ const ViewProject = () => {
     });
   };
 
-  // Priority badge color
   const getPriorityBadge = (priority) => {
-    switch(priority) {
+    switch (priority) {
       case 1: return 'bg-green-100 text-green-800';
       case 2: return 'bg-yellow-100 text-yellow-800';
       case 3: return 'bg-orange-100 text-orange-800';
@@ -384,7 +406,7 @@ const ViewProject = () => {
   };
 
   const getPriorityLabel = (priority) => {
-    switch(priority) {
+    switch (priority) {
       case 1: return 'Low';
       case 2: return 'Medium';
       case 3: return 'High';
@@ -392,6 +414,17 @@ const ViewProject = () => {
       default: return 'Unknown';
     }
   };
+
+  // Add this function to your projectService.js
+  // export const addProjectMember = async (projectId, userId, data) => {
+  //   try {
+  //     const response = await api.post(`/projects/${projectId}/members/${userId}`, data);
+  //     return response.data;
+  //   } catch (error) {
+  //     console.error("Add Project Member Error:", error.response?.data || error.message);
+  //     throw error;
+  //   }
+  // };
 
   if (loading) {
     return (
@@ -417,17 +450,6 @@ const ViewProject = () => {
           >
             Back to Projects
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#002d74] border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading project...</p>
         </div>
       </div>
     );
@@ -479,7 +501,7 @@ const ViewProject = () => {
                 <p className="text-sm text-gray-500">Project ID: #{project.id}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               {isEditing ? (
                 <>
@@ -517,7 +539,7 @@ const ViewProject = () => {
                   >
                     <Edit className="w-5 h-5" />
                   </button>
-                  <button 
+                  <button
                     onClick={handleDeleteClick}
                     className="p-2 hover:bg-red-50 rounded-lg transition text-red-600"
                     title="Delete Project"
@@ -697,31 +719,28 @@ const ViewProject = () => {
             <nav className="flex">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`px-6 py-3 text-sm font-medium ${
-                  activeTab === 'overview'
+                className={`px-6 py-3 text-sm font-medium ${activeTab === 'overview'
                     ? 'border-b-2 border-[#002d74] text-[#002d74]'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 Overview
               </button>
               <button
                 onClick={() => setActiveTab('members')}
-                className={`px-6 py-3 text-sm font-medium ${
-                  activeTab === 'members'
+                className={`px-6 py-3 text-sm font-medium ${activeTab === 'members'
                     ? 'border-b-2 border-[#002d74] text-[#002d74]'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 Team Members ({project.members?.length || 0})
               </button>
               <button
                 onClick={() => setActiveTab('threads')}
-                className={`px-6 py-3 text-sm font-medium ${
-                  activeTab === 'threads'
+                className={`px-6 py-3 text-sm font-medium ${activeTab === 'threads'
                     ? 'border-b-2 border-[#002d74] text-[#002d74]'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 Threads ({Array.isArray(threads) ? threads.length : 0})
               </button>
@@ -759,12 +778,7 @@ const ViewProject = () => {
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-800">Team Members</h3>
                   <button
-                    onClick={() => {
-                      setShowAddMemberForm(!showAddMemberForm);
-                      if (!showAddMemberForm) {
-                        loadAvailableUsers();
-                      }
-                    }}
+                    onClick={handleOpenAddMemberForm}
                     className="inline-flex items-center px-4 py-2 bg-[#002d74] text-white rounded-lg hover:bg-[#001a4d] transition text-sm font-medium"
                   >
                     <UserPlus className="w-4 h-4 mr-2" />
@@ -804,9 +818,11 @@ const ViewProject = () => {
                           disabled={addingMember}
                         >
                           <option value="">Choose a role...</option>
-                          <option value="developer">👨‍💻 Developer</option>
-                          <option value="tester">🧪 Tester</option>
-                          <option value="admin">🛡️ Admin</option>
+                          {availableRoles.map((role) => (
+                            <option key={role.id} value={role.id.toString()}>
+                              {role.displayName || role.name}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -889,88 +905,88 @@ const ViewProject = () => {
 
             {/* Threads Tab */}
             {activeTab === 'threads' && (
-  <div>
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Project Threads</h3>
-      <button
-        onClick={() => navigate(`/project/${id}/create-thread`)}
-        className="inline-flex items-center px-4 py-2 bg-[#002d74] text-white rounded-lg hover:bg-[#001a4d] transition text-sm font-medium"
-      >
-        <MessageSquare className="w-4 h-4 mr-2" />
-        Create New Thread
-      </button>
-    </div>
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Project Threads</h3>
+                  <button
+                    onClick={() => navigate(`/project/${id}/create-thread`)}
+                    className="inline-flex items-center px-4 py-2 bg-[#002d74] text-white rounded-lg hover:bg-[#001a4d] transition text-sm font-medium"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Create New Thread
+                  </button>
+                </div>
 
-    {threadsLoading ? (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#002d74] border-t-transparent mx-auto"></div>
-        <p className="text-gray-500 mt-2">Loading threads...</p>
-      </div>
-    ) : !Array.isArray(threads) || threads.length === 0 ? (
-      <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-        <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-        <h4 className="text-lg font-medium text-gray-700 mb-2">No Threads Yet</h4>
-        <p className="text-gray-500 mb-4">Start a conversation about this project</p>
-        <button
-          onClick={() => navigate(`/project/${id}/create-thread`)}
-          className="inline-flex items-center px-4 py-2 bg-[#002d74] text-white rounded-lg hover:bg-[#001a4d] transition"
-        >
-          Create First Thread
-        </button>
-      </div>
-    ) : (
-      <div className="space-y-4">
-        {threads.map((thread) => (
-          <div key={thread.id} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h4 className="text-lg font-semibold text-gray-800">{thread.topic || thread.title || 'Untitled Thread'}</h4>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityBadge(thread.priority || 1)}`}>
-                    {getPriorityLabel(thread.priority || 1)}
-                  </span>
-                </div>
-                <p className="text-gray-600 text-sm mb-3">{thread.description || thread.content || 'No description'}</p>
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <span className="flex items-center">
-                    <User className="w-3 h-3 mr-1" />
-                    Assigned to: User #{thread.assignUserId || thread.assignedTo || 'N/A'}
-                  </span>
-                  {thread.dueDate && (
-                    <span className="flex items-center">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      Due: {formatDate(thread.dueDate)}
-                    </span>
-                  )}
-                  <span className="flex items-center">
-                    <Clock className="w-3 h-3 mr-1" />
-                    Created: {formatDate(thread.createdAt || thread.created_at)}
-                  </span>
-                </div>
+                {threadsLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#002d74] border-t-transparent mx-auto"></div>
+                    <p className="text-gray-500 mt-2">Loading threads...</p>
+                  </div>
+                ) : !Array.isArray(threads) || threads.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+                    <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">No Threads Yet</h4>
+                    <p className="text-gray-500 mb-4">Start a conversation about this project</p>
+                    <button
+                      onClick={() => navigate(`/project/${id}/create-thread`)}
+                      className="inline-flex items-center px-4 py-2 bg-[#002d74] text-white rounded-lg hover:bg-[#001a4d] transition"
+                    >
+                      Create First Thread
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {threads.map((thread) => (
+                      <div key={thread.id} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="text-lg font-semibold text-gray-800">{thread.topic || thread.title || 'Untitled Thread'}</h4>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityBadge(thread.priority || 1)}`}>
+                                {getPriorityLabel(thread.priority || 1)}
+                              </span>
+                            </div>
+                            <p className="text-gray-600 text-sm mb-3">{thread.description || thread.content || 'No description'}</p>
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                              <span className="flex items-center">
+                                <User className="w-3 h-3 mr-1" />
+                                Assigned to: User #{thread.assignUserId || thread.assignedTo || 'N/A'}
+                              </span>
+                              {thread.dueDate && (
+                                <span className="flex items-center">
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  Due: {formatDate(thread.dueDate)}
+                                </span>
+                              )}
+                              <span className="flex items-center">
+                                <Clock className="w-3 h-3 mr-1" />
+                                Created: {formatDate(thread.createdAt || thread.created_at)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {/* View thread details */ }}
+                              className="p-1 hover:bg-gray-200 rounded transition text-gray-500"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteThreadClick(thread)}
+                              className="p-1 hover:bg-red-100 rounded transition text-red-500"
+                              title="Delete Thread"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {/* View thread details */}}
-                  className="p-1 hover:bg-gray-200 rounded transition text-gray-500"
-                  title="View Details"
-                >
-                  <Eye className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteThreadClick(thread)}
-                  className="p-1 hover:bg-red-100 rounded transition text-red-500"
-                  title="Delete Thread"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-)}
+            )}
           </div>
         </div>
       </div>

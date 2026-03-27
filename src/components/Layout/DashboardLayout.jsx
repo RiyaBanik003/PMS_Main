@@ -3,6 +3,7 @@ import SideNavbar from "../SideNavbar/SideNavbar";
 import TopBar from "../../pages/TopBar";
 import { useUserStore } from "../../store/userStore";
 import Footer from "../Footer/Footer";
+import { useState } from "react";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -13,6 +14,7 @@ const getGreeting = () => {
 
 export default function DashboardLayout({ children }) {
   const location = useLocation();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const getActiveNav = (path) => {
     if (path === "/dashboard") return "Overview";
@@ -20,7 +22,7 @@ export default function DashboardLayout({ children }) {
     if (path === "/user") return "User";
     if (path.startsWith("/editor") || path.startsWith("/view-project") || path.startsWith("/project")) return "Project";
     if (path.startsWith("/threads")) return "Threads";
-    return "Overview"; // default
+    return "Overview";
   };
 
   const activeNav = getActiveNav(location.pathname);
@@ -41,24 +43,35 @@ export default function DashboardLayout({ children }) {
     color: "#085041",
   };
 
+  const sidebarWidth = isSidebarCollapsed ? "80px" : "220px";
+
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "220px 1fr",
+        gridTemplateColumns: `${sidebarWidth} 1fr`,
         minHeight: "100vh",
         fontFamily: "'DM Sans', system-ui, sans-serif",
         background: "#f0ede5",
+        transition: "grid-template-columns 0.3s ease",
       }}
     >
       <SideNavbar
         activeNav={activeNav}
-        onNavChange={() => {}}
+        onNavChange={() => { }}
         user={CURRENT_USER}
+        onCollapse={setIsSidebarCollapsed}
+        isCollapsed={isSidebarCollapsed}
       />
 
       {/* ── Main area ── */}
-      <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", minHeight: "100vh" }}>
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        minHeight: "100vh",
+        width: "100%"
+      }}>
         <TopBar
           greeting={`${getGreeting()}, ${CURRENT_USER.name} 👋`}
           dateLabel="Monday, March 16 — Week 11"

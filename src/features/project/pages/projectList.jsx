@@ -268,7 +268,7 @@ const Projects = () => {
                       </div>
 
                       {/* Color bar at bottom */}
-                      <div className="h-1 bg-gradient-to-r from-[#002d74] to-[#1691fd] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
+                      <div className="h-1 bg-linear-to-r from-[#002d74] to-[#1691fd] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
                     </div>
                   ))}
                 </div>
