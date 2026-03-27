@@ -1,19 +1,18 @@
-import axios from "axios";
+import api from '../../../api/axios'
+const API_URL = "/projects";
 
-const API_URL = "https://pms-l909.onrender.com/api/v1/projects";
-
-export const createProject = async (projectData) => {
+export const createProject = async (projectData, config = {}) => {
     try {
-        const token = localStorage.getItem("accessToken"); // Change from "token" to "accessToken"
+        const isFormData = projectData instanceof FormData;
 
-        const response = await axios.post(
+        const response = await api.post(
             API_URL,
             projectData,
             {
                 headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
+                    ...(isFormData ? {} : { "Content-Type": "application/json" }),
                 },
+                ...config
             }
         );
 
@@ -23,81 +22,47 @@ export const createProject = async (projectData) => {
         throw error;
     }
 };
+
 export const getAllProjects = async (page = 1, limit = 10) => {
     try {
-        const token = localStorage.getItem("accessToken");
-        console.log("Token for getAllProjects:", token ? "Token exists" : "No token found");
-        console.log("Making API call to:", `${API_URL}?page=${page}&limit=${limit}`);
-
-        const response = await axios.get(
-            `${API_URL}?page=${page}&limit=${limit}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            }
-        );
-
-        console.log("API Response status:", response.status);
-        console.log("API Response data:", response.data);
-
+        const response = await api.get(`${API_URL}?page=${page}&limit=${limit}`);
         return response.data;
     } catch (error) {
         console.error("Get Projects Error:", error.response?.data || error.message);
-        console.error("Error status:", error.response?.status);
-        console.error("Error headers:", error.response?.headers);
         throw error;
     }
 };
+
 export const getProjectById = async (projectId) => {
     try {
-        const token = localStorage.getItem("accessToken");
-
-        const response = await axios.get(
-            `${API_URL}/${projectId}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            }
-        );
-
+        const response = await api.get(`${API_URL}/${projectId}`);
         return response.data;
     } catch (error) {
         console.error("Get Project Error:", error.response?.data || error.message);
         throw error;
     }
 };
+
 export const deleteProject = async (projectId) => {
     try {
-        const token = localStorage.getItem("accessToken");
-
-        const response = await axios.delete(
-            `${API_URL}/${projectId}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            }
-        );
-
+        const response = await api.delete(`${API_URL}/${projectId}`);
         return response.data;
     } catch (error) {
         console.error("Delete Project Error:", error.response?.data || error.message);
         throw error;
     }
 };
+
 export const updateProject = async (projectId, projectData) => {
     try {
-        const token = localStorage.getItem("accessToken");
+        const isFormData = projectData instanceof FormData;
 
-        const response = await axios.put(
+        const response = await api.put(
             `${API_URL}/${projectId}`,
             projectData,
             {
                 headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
+                    ...(isFormData ? {} : { "Content-Type": "application/json" }),
                 },
             }
         );
@@ -105,6 +70,26 @@ export const updateProject = async (projectId, projectData) => {
         return response.data;
     } catch (error) {
         console.error("Update Project Error:", error.response?.data || error.message);
+        throw error;
+    }
+};
+
+export const addProjectMember = async (projectId, userId, data) => {
+    try {
+        // Use api instead of axios
+        const response = await api.post(
+            `${API_URL}/${projectId}/members/${userId}`,
+            data,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error("Add Project Member Error:", error.response?.data || error.message);
         throw error;
     }
 };
