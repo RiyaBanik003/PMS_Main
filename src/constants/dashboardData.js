@@ -82,12 +82,22 @@ export const navItems = [
       { label: "View Projects", path: "/view-project" }
     ]
   },
+  
   {
     icon: "threads",
     label: "Threads",
     children: [
       { label: "All Threads", path: "/threads" },
-      { label: "Create Thread", path: "/threads/create" }
+    ]
+  },
+  
+  // Tasks Section - Added here
+  {
+    icon: "tasks",
+    label: "Tasks",
+    children: [
+      { label: "All Tasks", path: "/tasks" },
+
     ]
   }
 ];
